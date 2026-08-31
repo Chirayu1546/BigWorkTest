@@ -14,6 +14,7 @@ const translations = {
     usernamePlaceholder: 'johndoe',
     password: 'Password',
     passwordPlaceholder: '••••••••',
+    passwordHint: 'Enter your account password',
     btn: 'Sign In',
     noAccount: "Don't have an account?",
     create: 'Create Account',
@@ -29,6 +30,7 @@ const translations = {
     usernamePlaceholder: 'johndoe',
     password: 'รหัสผ่าน',
     passwordPlaceholder: '••••••••',
+    passwordHint: 'กรอกรหัสผ่านของบัญชีคุณ',
     btn: 'เข้าสู่ระบบ',
     noAccount: 'ยังไม่มีบัญชีใช่หรือไม่?',
     create: 'สมัครสมาชิกใหม่',
@@ -194,6 +196,12 @@ const Login = () => {
                   {showPassword ? <Eye size={17} /> : <EyeOff size={17} />}
                 </button>
               </div>
+              {/* แสดง hint เฉพาะเมื่อผู้ใช้เริ่มพิมพ์แล้วเท่านั้น */}
+              {formData.password.length > 0 && (
+                <p style={{ fontSize: '11px', marginTop: '4px', fontWeight: '500', color: 'var(--text-muted)' }}>
+                  {t.passwordHint}
+                </p>
+              )}
             </div>
 
             {/* Remember me */}

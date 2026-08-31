@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import axiosClient from '../api/axiosClient';
 import { AuthContext } from '../context/AuthContext';
 import { CartContext } from '../context/CartContext';
@@ -19,6 +19,8 @@ const translations = {
     addedInfo: 'Added to cart (Backend pending)',
     inStock: 'In Stock',
     outStockLabel: 'Out of Stock',
+    allCategories: 'All',
+    uncategorized: 'Uncategorized',
   },
   th: {
     title: 'สินค้าของเรา',
@@ -33,12 +35,15 @@ const translations = {
     addedInfo: 'เพิ่มลงตะกร้าแล้ว (Backend กำลังพัฒนา)',
     inStock: 'มีสินค้า',
     outStockLabel: 'สินค้าหมด',
+    allCategories: 'ทั้งหมด',
+    uncategorized: 'ไม่ระบุหมวดหมู่',
   }
 };
 
 const Products = ({ lang = 'th' }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const { user } = useContext(AuthContext);
   const { addToCart } = useContext(CartContext);
   const t = translations[lang] || translations['th'];
@@ -66,6 +71,26 @@ const Products = ({ lang = 'th' }) => {
     addToCart(product);
   };
 
+  // ดึงรายชื่อหมวดหมู่ที่ไม่ซ้ำจากสินค้าทั้งหมด
+  const categories = useMemo(() => {
+    const map = new Map();
+    products.forEach((p) => {
+      const id = p.Category?.category_id ?? p.category_id ?? 'uncategorized';
+      const name = p.Category?.category_name || t.uncategorized;
+      if (!map.has(id)) map.set(id, name);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [products, t.uncategorized]);
+
+  // กรองสินค้าตามหมวดหมู่ที่เลือก
+  const filteredProducts = useMemo(() => {
+    if (selectedCategory === 'all') return products;
+    return products.filter((p) => {
+      const id = p.Category?.category_id ?? p.category_id ?? 'uncategorized';
+      return id === selectedCategory;
+    });
+  }, [products, selectedCategory]);
+
   if (loading) return (
     <div className="loading-wrap">
       <div className="spinner-ring" />
@@ -81,7 +106,50 @@ const Products = ({ lang = 'th' }) => {
         <p className="page-subtitle">{t.subtitle}</p>
       </div>
 
-      {products.length === 0 ? (
+      {/* Category Tabs */}
+      {products.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
+          <button
+            onClick={() => setSelectedCategory('all')}
+            style={{
+              padding: '8px 18px',
+              borderRadius: '999px',
+              border: selectedCategory === 'all' ? '1.5px solid var(--accent-mid)' : '1.5px solid var(--border)',
+              background: selectedCategory === 'all' ? 'var(--accent-light)' : 'transparent',
+              color: selectedCategory === 'all' ? 'var(--accent-text)' : 'var(--text-muted)',
+              fontSize: '13px',
+              fontWeight: '700',
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {t.allCategories}
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '999px',
+                border: selectedCategory === cat.id ? '1.5px solid var(--accent-mid)' : '1.5px solid var(--border)',
+                background: selectedCategory === cat.id ? 'var(--accent-light)' : 'transparent',
+                color: selectedCategory === cat.id ? 'var(--accent-text)' : 'var(--text-muted)',
+                fontSize: '13px',
+                fontWeight: '700',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredProducts.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">
             <Package size={32} />
@@ -114,7 +182,7 @@ const Products = ({ lang = 'th' }) => {
         </div>
       ) : (
         <div className="products-grid">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <div className="product-card-wrap" key={product.product_id}>
               <div className="product-card">
                 {/* Image */}
@@ -140,6 +208,19 @@ const Products = ({ lang = 'th' }) => {
                     }} />
                     {product.stock_qty > 0 ? t.inStock : t.outStockLabel}
                   </span>
+
+                  {product.Category?.category_name && (
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color: 'var(--accent-text)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px',
+                      marginTop: '6px',
+                    }}>
+                      {product.Category.category_name}
+                    </div>
+                  )}
 
                   <div className="product-card-name">{product.product_name}</div>
                   <div className="product-card-price">

@@ -13,6 +13,7 @@ const Product = require('./Models/ProductModel');
 const Order = require('./Models/OrderModel');
 const OrderItem = require('./Models/OrderItemModel');
 
+
 // ===== Associations =====
 Category.hasMany(Product, { foreignKey: 'category_id' });
 Product.belongsTo(Category, { foreignKey: 'category_id' });
@@ -43,11 +44,12 @@ app.use('/api/auth', require('./Routes/AuthRouter'));
 app.use('/api/products', require('./Routes/ProductRouter'));
 app.use('/api/orders', require('./Routes/OrderRouter'));
 app.use('/api/users', require('./Routes/UserRouter'));
+app.use('/api/categories', require('./Routes/CategoryRouter'));
 const PORT = process.env.PORT || 5000;
 
 sequelize.authenticate()
   .then(() => {
-    console.log('✅ เชื่อมต่อ MySQL (XAMPP) สำเร็จ');
+    console.log('connected to Database successfully');
     return sequelize.sync();
   })
   .then(() => {

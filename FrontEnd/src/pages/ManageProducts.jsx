@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, X, Search, Package2 } from 'lucide-react';
 
 const ManageProducts = ({ lang }) => {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -12,28 +13,31 @@ const ManageProducts = ({ lang }) => {
   const [currentId, setCurrentId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
-    product_name: '', price: '', stock_qty: '', image_url: '', description: '',
+    product_name: '', price: '', stock_qty: '', image_url: '', description: '', category_id: '',
   });
 
   const t = {
-    title:         lang === 'en' ? 'Manage Products'    : 'จัดการสินค้า',
-    subtitle:      lang === 'en' ? 'Add, edit and delete products in your store' : 'เพิ่ม แก้ไข และลบสินค้าในร้านค้าของคุณ',
-    add:           lang === 'en' ? 'Add Product'        : 'เพิ่มสินค้า',
-    search:        lang === 'en' ? 'Search products...' : 'ค้นหาสินค้า...',
-    name:          lang === 'en' ? 'Product Name'       : 'ชื่อสินค้า',
-    price:         lang === 'en' ? 'Price (฿)'          : 'ราคา (฿)',
-    stock:         lang === 'en' ? 'Stock'              : 'สต็อก',
-    actions:       lang === 'en' ? 'Actions'            : 'จัดการ',
-    editTitle:     lang === 'en' ? 'Edit Product'       : 'แก้ไขสินค้า',
-    addTitle:      lang === 'en' ? 'Add New Product'    : 'เพิ่มสินค้าใหม่',
-    deleteConfirm: lang === 'en' ? 'Delete this product?' : 'คุณต้องการลบสินค้านี้ใช่ไหม?',
-    save:          lang === 'en' ? 'Save'               : 'บันทึก',
-    cancel:        lang === 'en' ? 'Cancel'             : 'ยกเลิก',
-    imgUrl:        lang === 'en' ? 'Image URL (optional)' : 'URL รูปภาพ (ไม่บังคับ)',
-    desc:          lang === 'en' ? 'Description (optional)' : 'รายละเอียดสินค้า (ไม่บังคับ)',
-    empty:         lang === 'en' ? 'No products yet'   : 'ยังไม่มีสินค้า',
-    emptyDesc:     lang === 'en' ? 'Click "Add Product" to create your first product.' : 'กดปุ่ม "เพิ่มสินค้า" เพื่อเริ่มต้นเพิ่มสินค้าชิ้นแรก',
-    total:         lang === 'en' ? 'products total'     : 'สินค้าทั้งหมด',
+    title:          lang === 'en' ? 'Manage Products'    : 'จัดการสินค้า',
+    subtitle:       lang === 'en' ? 'Add, edit and delete products in your store' : 'เพิ่ม แก้ไข และลบสินค้าในร้านค้าของคุณ',
+    add:            lang === 'en' ? 'Add Product'        : 'เพิ่มสินค้า',
+    search:         lang === 'en' ? 'Search products...' : 'ค้นหาสินค้า...',
+    name:           lang === 'en' ? 'Product Name'       : 'ชื่อสินค้า',
+    price:          lang === 'en' ? 'Price (฿)'          : 'ราคา (฿)',
+    stock:          lang === 'en' ? 'Stock'              : 'สต็อก',
+    category:       lang === 'en' ? 'Category'           : 'หมวดหมู่',
+    selectCategory: lang === 'en' ? 'Select a category'  : 'เลือกหมวดหมู่',
+    actions:        lang === 'en' ? 'Actions'            : 'จัดการ',
+    editTitle:      lang === 'en' ? 'Edit Product'       : 'แก้ไขสินค้า',
+    addTitle:       lang === 'en' ? 'Add New Product'    : 'เพิ่มสินค้าใหม่',
+    deleteConfirm:  lang === 'en' ? 'Delete this product?' : 'คุณต้องการลบสินค้านี้ใช่ไหม?',
+    save:           lang === 'en' ? 'Save'               : 'บันทึก',
+    cancel:         lang === 'en' ? 'Cancel'             : 'ยกเลิก',
+    imgUrl:         lang === 'en' ? 'Image URL (optional)' : 'URL รูปภาพ (ไม่บังคับ)',
+    desc:           lang === 'en' ? 'Description (optional)' : 'รายละเอียดสินค้า (ไม่บังคับ)',
+    empty:          lang === 'en' ? 'No products yet'   : 'ยังไม่มีสินค้า',
+    emptyDesc:      lang === 'en' ? 'Click "Add Product" to create your first product.' : 'กดปุ่ม "เพิ่มสินค้า" เพื่อเริ่มต้นเพิ่มสินค้าชิ้นแรก',
+    total:          lang === 'en' ? 'products total'     : 'สินค้าทั้งหมด',
+    noCategory:     lang === 'en' ? 'Uncategorized'      : 'ไม่ระบุหมวดหมู่',
   };
 
   const fetchProducts = async () => {
@@ -48,7 +52,16 @@ const ManageProducts = ({ lang }) => {
     }
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  const fetchCategories = async () => {
+    try {
+      const res = await axiosClient.get('/categories');
+      setCategories(res.data);
+    } catch {
+      toast.error('Failed to load categories');
+    }
+  };
+
+  useEffect(() => { fetchProducts(); fetchCategories(); }, []);
 
   const openModal = (product = null) => {
     if (product) {
@@ -57,27 +70,32 @@ const ManageProducts = ({ lang }) => {
         product_name: product.product_name, price: product.price,
         stock_qty: product.stock_qty, image_url: product.image_url || '',
         description: product.description || '',
+        category_id: product.category_id || product.Category?.category_id || '',
       });
     } else {
       setEditMode(false); setCurrentId(null);
-      setFormData({ product_name: '', price: '', stock_qty: '', image_url: '', description: '' });
+      setFormData({ product_name: '', price: '', stock_qty: '', image_url: '', description: '', category_id: '' });
     }
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
-    setFormData({ product_name: '', price: '', stock_qty: '', image_url: '', description: '' });
+    setFormData({ product_name: '', price: '', stock_qty: '', image_url: '', description: '', category_id: '' });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true);
     try {
+      const payload = {
+        ...formData,
+        category_id: formData.category_id ? Number(formData.category_id) : null,
+      };
       if (editMode) {
-        await axiosClient.put(`/products/${currentId}`, formData);
+        await axiosClient.put(`/products/${currentId}`, payload);
         toast.success(lang === 'en' ? 'Product updated!' : 'แก้ไขสินค้าสำเร็จ!');
       } else {
-        await axiosClient.post('/products', formData);
+        await axiosClient.post('/products', payload);
         toast.success(lang === 'en' ? 'Product added!' : 'เพิ่มสินค้าสำเร็จ!');
       }
       closeModal(); fetchProducts();
@@ -180,9 +198,9 @@ const ManageProducts = ({ lang }) => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-hover)', borderBottom: '1px solid var(--border)' }}>
-                  {['#', t.name, t.price, t.stock, t.actions].map((h, i) => (
+                  {['#', t.name, t.category, t.price, t.stock, t.actions].map((h, i) => (
                     <th key={i} style={{
-                      padding: '13px 20px', textAlign: i === 4 ? 'right' : 'left',
+                      padding: '13px 20px', textAlign: i === 5 ? 'right' : 'left',
                       fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)',
                       textTransform: 'uppercase', letterSpacing: '0.6px', whiteSpace: 'nowrap',
                     }}>{h}</th>
@@ -229,6 +247,11 @@ const ManageProducts = ({ lang }) => {
                             )}
                           </div>
                         </div>
+                      </td>
+
+                      {/* Category */}
+                      <td style={{ padding: '16px 20px', fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {p.Category?.category_name || t.noCategory}
                       </td>
 
                       {/* Price */}
@@ -327,6 +350,24 @@ const ManageProducts = ({ lang }) => {
                   placeholder={lang === 'en' ? 'e.g. iPhone 15 Pro' : 'เช่น iPhone 15 Pro'}
                   required
                 />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label style={labelStyle}>{t.category}</label>
+                <select
+                  className="premium-input"
+                  name="category_id"
+                  value={formData.category_id}
+                  onChange={e => setFormData({ ...formData, category_id: e.target.value })}
+                >
+                  <option value="">{t.selectCategory}</option>
+                  {categories.map((cat) => (
+                    <option key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Price + Stock */}

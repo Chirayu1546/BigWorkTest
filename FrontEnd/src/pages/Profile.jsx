@@ -11,9 +11,13 @@ const Profile = ({ lang = 'th' }) => {
   const [passwords, setPasswords] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [loadingPassword, setLoadingPassword] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
   const fileInputRef = useRef(null);
+
+  // ── รูปโปรไฟล์: เก็บไว้รอ ยังไม่ยิง API จนกว่าจะกดบันทึก ──
+  const [pendingAvatarFile, setPendingAvatarFile] = useState(null);   // File ที่เพิ่งเลือก (ยังไม่อัปโหลด)
+  const [pendingAvatarPreview, setPendingAvatarPreview] = useState(null); // URL preview จากเครื่อง
+  const [pendingAvatarRemoved, setPendingAvatarRemoved] = useState(false); // ตั้งใจจะลบรูปเดิมตอนบันทึก
 
   const t = {
     title:        lang === 'en' ? 'My Profile'          : 'โปรไฟล์ของฉัน',
@@ -30,8 +34,12 @@ const Profile = ({ lang = 'th' }) => {
     savePwd:      lang === 'en' ? 'Update Password'     : 'อัปเดตรหัสผ่าน',
     role:         lang === 'en' ? 'Account Role'        : 'บทบาท',
     roleNote:     lang === 'en' ? 'Roles are assigned by an administrator.' : 'บทบาทกำหนดโดยผู้ดูแลระบบ',
+    roleNoteAdmin:lang === 'en' ? 'As an admin, you can change your own role.' : 'ในฐานะแอดมิน คุณสามารถเปลี่ยนบทบาทของตัวเองได้',
     joined:       lang === 'en' ? 'Member since'        : 'สมาชิกตั้งแต่',
     emailNote:    lang === 'en' ? 'Email cannot be changed' : 'ไม่สามารถเปลี่ยนอีเมลได้',
+    removePhoto:  lang === 'en' ? 'Remove photo'        : 'ลบรูปภาพ',
+    avatarPendingNote: lang === 'en' ? 'Photo will be updated when you save.' : 'รูปภาพจะถูกอัปเดตเมื่อกดบันทึก',
+    avatarRemovePendingNote: lang === 'en' ? 'Photo will be removed when you save.' : 'รูปภาพจะถูกลบเมื่อกดบันทึก',
   };
 
   useEffect(() => {
@@ -54,22 +62,82 @@ const Profile = ({ lang = 'th' }) => {
     fetch();
   }, [user]);
 
+  // เคลียร์ object URL ตอน unmount กันหน่วยความจำรั่ว
+  useEffect(() => {
+    return () => {
+      if (pendingAvatarPreview) URL.revokeObjectURL(pendingAvatarPreview);
+    };
+  }, [pendingAvatarPreview]);
+
+  // เลือกไฟล์รูปใหม่ — แค่ preview ไว้ก่อน ยังไม่อัปโหลด
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (pendingAvatarPreview) URL.revokeObjectURL(pendingAvatarPreview);
+    setPendingAvatarFile(file);
+    setPendingAvatarPreview(URL.createObjectURL(file));
+    setPendingAvatarRemoved(false);
+    e.target.value = ''; // เผื่อเลือกไฟล์เดิมซ้ำอีกครั้ง
+  };
+
+  // กดปุ่ม × — ยกเลิกไฟล์ที่เพิ่งเลือก หรือ mark ว่าจะลบรูปเดิมตอนบันทึก
+  const handleAvatarClear = (e) => {
+    e.stopPropagation();
+    if (pendingAvatarFile) {
+      if (pendingAvatarPreview) URL.revokeObjectURL(pendingAvatarPreview);
+      setPendingAvatarFile(null);
+      setPendingAvatarPreview(null);
+    } else if (profile.profile_picture) {
+      setPendingAvatarRemoved(true);
+    }
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setLoadingProfile(true);
     try {
+      let updatedProfilePicture = profile.profile_picture;
+
+      // 1) ถ้าเลือกไฟล์ใหม่ไว้ -> อัปโหลดตอนนี้
+      if (pendingAvatarFile) {
+        const formData = new FormData();
+        formData.append('avatar', pendingAvatarFile);
+        const avatarRes = await axiosClient.post(`/users/profile/${user.user_id}/avatar`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        updatedProfilePicture = avatarRes.data.profile_picture;
+      }
+      // 2) ถ้า mark ไว้ว่าจะลบรูปเดิม -> ลบตอนนี้
+      else if (pendingAvatarRemoved) {
+        await axiosClient.delete(`/users/profile/${user.user_id}/avatar`);
+        updatedProfilePicture = '';
+      }
+
+      // 3) อัปเดตข้อมูลโปรไฟล์ (ชื่อ/อีเมล/เบอร์/บทบาท)
       const res = await axiosClient.put(`/users/profile/${user.user_id}`, {
         full_name: profile.full_name,
         email:     profile.email,
         phone:     profile.phone,
+        role:      profile.role,
       });
-      // Update AuthContext so Sidebar/Topbar reflects new name/email
+
+      // อัปเดต state + AuthContext ให้ตรงกันทั้งหมดในทีเดียว
+      const finalProfile = { ...res.data, profile_picture: updatedProfilePicture };
+      setProfile((currentProfile) => ({ ...currentProfile, ...finalProfile }));
       updateUser({
-        full_name: res.data.full_name,
-        email: res.data.email,
-        role: res.data.role,
-        profile_picture: res.data.profile_picture,
+        full_name: finalProfile.full_name,
+        email: finalProfile.email,
+        role: finalProfile.role,
+        profile_picture: finalProfile.profile_picture,
       });
+
+      // เคลียร์สถานะ pending ทั้งหมด
+      if (pendingAvatarPreview) URL.revokeObjectURL(pendingAvatarPreview);
+      setPendingAvatarFile(null);
+      setPendingAvatarPreview(null);
+      setPendingAvatarRemoved(false);
+
       toast.success(lang === 'en' ? 'Profile updated!' : 'อัปเดตโปรไฟล์สำเร็จ!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error updating profile');
@@ -103,30 +171,16 @@ const Profile = ({ lang = 'th' }) => {
     }
   };
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const formData = new FormData();
-    formData.append('avatar', file);
-
-    setUploading(true);
-    try {
-      const res = await axiosClient.post(`/users/profile/${user.user_id}/avatar`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setProfile((currentProfile) => ({ ...currentProfile, profile_picture: res.data.profile_picture }));
-      updateUser({ profile_picture: res.data.profile_picture });
-      toast.success(lang === 'en' ? 'Avatar updated!' : 'เปลี่ยนรูปโปรไฟล์สำเร็จ!');
-    } catch {
-      toast.error('Failed to upload avatar');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const avatarLetter = user?.username?.charAt(0).toUpperCase() || '?';
-  const avatarUrl = profile.profile_picture ? `http://localhost:5000/uploads/${profile.profile_picture}` : null;
+
+  // ลำดับความสำคัญของรูปที่แสดง: preview ที่เพิ่งเลือก > รูปเดิมจาก server (ถ้าไม่ได้ mark ว่าจะลบ) > ไม่มีรูป
+  const displayAvatarUrl = pendingAvatarPreview
+    ? pendingAvatarPreview
+    : (!pendingAvatarRemoved && profile.profile_picture)
+      ? `http://localhost:5000/uploads/${profile.profile_picture}`
+      : null;
+
+  const hasPendingChange = !!pendingAvatarFile || pendingAvatarRemoved;
 
   return (
     <div style={{ maxWidth: '720px', margin: '0 auto' }}>
@@ -140,36 +194,51 @@ const Profile = ({ lang = 'th' }) => {
       </div>
 
       {/* Avatar + Info Card */}
-      <div className="glass-card" style={{ padding: '28px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '24px' }}>
-        
+      <div className="glass-card" style={{ padding: '28px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '24px' }}>
+
         {/* Big Avatar */}
-        <div 
-          onClick={() => fileInputRef.current?.click()}
-          style={{
-            width: '80px', height: '80px', borderRadius: '24px', flexShrink: 0,
-            background: avatarUrl ? 'transparent' : 'var(--brand-gradient)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '32px', fontWeight: '900', color: '#fff',
-            boxShadow: '0 8px 24px var(--accent-glow)',
-            cursor: 'pointer', position: 'relative', overflow: 'hidden'
-          }}>
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            avatarLetter
-          )}
-          {uploading && (
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ width: '20px', height: '20px', border: '3px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            </div>
-          )}
-          {!uploading && (
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              width: '80px', height: '80px', borderRadius: '24px', flexShrink: 0,
+              background: displayAvatarUrl ? 'transparent' : 'var(--brand-gradient)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '32px', fontWeight: '900', color: '#fff',
+              boxShadow: '0 8px 24px var(--accent-glow)',
+              cursor: 'pointer', position: 'relative', overflow: 'hidden',
+              outline: hasPendingChange ? '2.5px dashed var(--accent)' : 'none',
+              outlineOffset: '2px',
+            }}>
+            {displayAvatarUrl ? (
+              <img src={displayAvatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              avatarLetter
+            )}
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', padding: '2px', display: 'flex', justifyContent: 'center' }}>
               <Camera size={14} color="#fff" />
             </div>
+          </div>
+
+          {/* ปุ่มยกเลิก/ลบรูป - แสดงเมื่อมีรูปให้ลบ หรือมีไฟล์รอเลือกอยู่ */}
+          {displayAvatarUrl && (
+            <button
+              type="button"
+              onClick={handleAvatarClear}
+              title={t.removePhoto}
+              style={{
+                position: 'absolute', top: '-6px', right: '-6px',
+                width: '22px', height: '22px', borderRadius: '50%',
+                background: 'var(--danger, #ef4444)', border: '2px solid var(--bg-card)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', padding: 0, fontSize: '12px', fontWeight: '900', lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
           )}
         </div>
-        <input type="file" ref={fileInputRef} onChange={handleAvatarChange} style={{ display: 'none' }} accept="image/*" />
+        <input type="file" ref={fileInputRef} onChange={handleAvatarSelect} style={{ display: 'none' }} accept="image/*" />
 
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '4px' }}>
@@ -196,6 +265,18 @@ const Profile = ({ lang = 'th' }) => {
           </div>
         </div>
       </div>
+
+      {/* แจ้งเตือนว่ามีการเปลี่ยนรูปรออยู่ ยังไม่บันทึก */}
+      {hasPendingChange && (
+        <div style={{
+          fontSize: '12px', fontWeight: '700', color: 'var(--accent-text)',
+          background: 'var(--accent-light)', padding: '8px 14px', borderRadius: '10px',
+          marginBottom: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px',
+        }}>
+          <Camera size={13} />
+          {pendingAvatarRemoved ? t.avatarRemovePendingNote : t.avatarPendingNote}
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', background: 'var(--bg-input)', padding: '4px', borderRadius: '14px', width: 'fit-content' }}>
@@ -248,21 +329,22 @@ const Profile = ({ lang = 'th' }) => {
               />
             </div>
 
-            {/* Role is visible to every user, but only the backend can assign it. */}
+            {/* Role: admin แก้ของตัวเองได้ / user แก้ไม่ได้ */}
             <div>
               <label style={labelStyle}><ShieldCheck size={13} /> {t.role}</label>
               <select
                 className="premium-input"
                 value={profile.role || 'user'}
-                disabled
+                onChange={e => setProfile({ ...profile, role: e.target.value })}
+                disabled={profile.role !== 'admin'}
                 aria-label={t.role}
-                style={{ cursor: 'not-allowed', opacity: 0.75 }}
+                style={profile.role !== 'admin' ? { cursor: 'not-allowed', opacity: 0.75 } : {}}
               >
                 <option value="user">USER</option>
                 <option value="admin">ADMIN</option>
               </select>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '6px 0 0' }}>
-                {t.roleNote}
+                {profile.role === 'admin' ? t.roleNoteAdmin : t.roleNote}
               </p>
             </div>
 

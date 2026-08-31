@@ -112,6 +112,10 @@ router.post('/register', authController.register);
  *                       type: string
  *                     role:
  *                       type: string
+ *                     profile_picture:
+ *                       type: string
+ *                       nullable: true
+ *                       example: "image"
  *       400:
  *         description: Missing or invalid request fields
  *       401:

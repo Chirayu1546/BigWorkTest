@@ -1,4 +1,6 @@
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 const User = require('../Models/UserModel');
 
 // GET /api/users/profile/:id
@@ -18,10 +20,15 @@ exports.getProfile = async (req, res) => {
 // PUT /api/users/profile/:id
 exports.updateProfile = async (req, res) => {
   try {
+    // req.user ต้องมาจาก auth middleware (verifyToken) — ถ้ายังไม่มีต้องเพิ่ม middleware นี้ก่อนเส้นทางนี้ใน routes
+    if (!req.user || req.user.user_id !== parseInt(req.params.id, 10)) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const { full_name, email, phone, current_password, new_password } = req.body;
+    const { full_name, email, phone, current_password, new_password, role } = req.body;
 
     // If changing password, verify current password first
     if (new_password) {
@@ -48,6 +55,29 @@ exports.updateProfile = async (req, res) => {
     // Update profile fields
     user.full_name = full_name || user.full_name;
     user.phone     = phone     ?? user.phone;
+
+    // ── ROLE CHANGE ──────────────────────────────
+    // เฉพาะ admin เท่านั้นที่เปลี่ยน role ตัวเองได้ / user ห้ามส่ง role มาแล้วมีผล
+    if (role !== undefined && role !== user.role) {
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'You are not allowed to change your role' });
+      }
+
+      const allowedRoles = ['admin', 'user'];
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ message: 'Invalid role' });
+      }
+
+      if (role === 'admin') {
+        const adminCount = await User.count({ where: { role: 'admin' } });
+        if (adminCount >= 2) {
+          return res.status(400).json({ message: 'Maximum of 2 admins allowed' });
+        }
+      }
+
+      user.role = role;
+    }
+    // ─────────────────────────────────────────────
 
     await user.save();
 
@@ -84,6 +114,50 @@ exports.uploadAvatar = async (req, res) => {
       message: 'Avatar updated successfully',
       profile_picture: user.profile_picture
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// DELETE /api/users/profile/:id/avatar
+exports.deleteAvatar = async (req, res) => {
+  try {
+    if (!req.user || req.user.user_id !== parseInt(req.params.id, 10)) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (!user.profile_picture) {
+      return res.status(400).json({ message: 'No avatar to delete' });
+    }
+
+    // ลบไฟล์จริงออกจาก disk (ไม่ให้ error ทำให้ทั้ง request ล้ม หากไฟล์หายไปแล้ว)
+    const filePath = path.join(__dirname, '..', 'uploads', user.profile_picture);
+    fs.unlink(filePath, (err) => {
+      if (err) console.error('Failed to delete avatar file:', err.message);
+    });
+
+    user.profile_picture = null;
+    await user.save();
+
+    res.json({ message: 'Avatar removed successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// GET /api/users  (admin only)
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ['user_id', 'username', 'email', 'full_name', 'phone', 'role', 'profile_picture', 'created_at'],
+      order: [['created_at', 'DESC']],
+    });
+    res.json(users);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

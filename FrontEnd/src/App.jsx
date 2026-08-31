@@ -15,6 +15,7 @@ import ManageProducts from './pages/ManageProducts';
 import Cart from './pages/Cart';
 import Invoice from './pages/Invoice';
 import Profile from './pages/Profile';
+import EmployeeList from './pages/EmployeeList';
 
 const Layout = ({ children, lang, setLang }) => {
   const location = useLocation();
@@ -77,6 +78,7 @@ function App() {
                 <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
                 <Route path="/products" element={<RequireAuth><Products lang={lang} /></RequireAuth>} />
                 <Route path="/manage-products" element={<RequireAuth><RequireAdmin><ManageProducts lang={lang} /></RequireAdmin></RequireAuth>} />
+                <Route path="/employees" element={<RequireAuth><RequireAdmin><EmployeeList lang={lang} /></RequireAdmin></RequireAuth>} />
                 <Route path="/cart" element={<RequireAuth><Cart lang={lang} /></RequireAuth>} />
                 <Route path="/invoice/:orderId" element={<RequireAuth><Invoice /></RequireAuth>} />
                 <Route path="/profile" element={<RequireAuth><Profile lang={lang} /></RequireAuth>} />

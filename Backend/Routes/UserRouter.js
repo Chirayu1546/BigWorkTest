@@ -3,7 +3,7 @@ const router = express.Router();
 const userController = require('../Controllers/UserController');
 const multer = require('multer');
 const path = require('path');
-const { authenticate } = require('../Middleware/authMiddleware');
+const { authenticate, requireAdmin } = require('../Middleware/authMiddleware');
 
 const requireOwnProfile = (req, res, next) => {
   if (req.user.role !== 'admin' && req.user.user_id !== Number(req.params.id)) {
@@ -182,5 +182,87 @@ router.put('/profile/:id', authenticate, requireOwnProfile, userController.updat
  *         description: User not found
  */
 router.post('/profile/:id/avatar', authenticate, requireOwnProfile, upload.single('avatar'), userController.uploadAvatar);
+
+/**
+ * @swagger
+ * /api/users/profile/{id}/avatar:
+ *   delete:
+ *     summary: Remove user's profile picture
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Avatar removed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Avatar removed successfully"
+ *       400:
+ *         description: No avatar to delete
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not the profile owner)
+ *       404:
+ *         description: User not found
+ */
+router.delete('/profile/:id/avatar', authenticate, requireOwnProfile, userController.deleteAvatar);
+
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get all users (admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: A list of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   user_id:
+ *                     type: integer
+ *                   username:
+ *                     type: string
+ *                   email:
+ *                     type: string
+ *                   full_name:
+ *                     type: string
+ *                   phone:
+ *                     type: string
+ *                   role:
+ *                     type: string
+ *                     enum: [admin, user]
+ *                   profile_picture:
+ *                     type: string
+ *                   created_at:
+ *                     type: string
+ *                     format: date-time
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not admin)
+ *       500:
+ *         description: Server error
+ */
+router.get('/', authenticate, requireAdmin, userController.getAllUsers);
 
 module.exports = router;

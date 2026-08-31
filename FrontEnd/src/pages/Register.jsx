@@ -15,6 +15,7 @@ const translations = {
     emailPlaceholder: 'name@example.com',
     password: 'Password',
     passwordPlaceholder: '••••••••',
+    passwordHint: 'Must be at least 8 characters',
     confirmPassword: 'Confirm Password',
     confirmPasswordPlaceholder: '••••••••',
     fullname: 'Full Name',
@@ -26,6 +27,8 @@ const translations = {
     fail: 'Registration failed',
     passwordMismatch: 'Passwords do not match!',
     passwordLength: 'Password must be at least 8 characters.',
+    usernameInvalid: 'Username must be English letters, numbers, underscore only (no spaces)',
+    passwordInvalid: 'Password must be English letters/numbers/symbols only',
     required: '*',
   },
   th: {
@@ -37,6 +40,7 @@ const translations = {
     emailPlaceholder: 'name@example.com',
     password: 'รหัสผ่าน',
     passwordPlaceholder: '••••••••',
+    passwordHint: 'ต้องมีอย่างน้อย 8 ตัวอักษร',
     confirmPassword: 'ยืนยันรหัสผ่าน',
     confirmPasswordPlaceholder: '••••••••',
     fullname: 'ชื่อ-นามสกุล',
@@ -48,9 +52,15 @@ const translations = {
     fail: 'สมัครสมาชิกไม่สำเร็จ',
     passwordMismatch: 'รหัสผ่านไม่ตรงกัน!',
     passwordLength: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร',
+    usernameInvalid: 'ชื่อผู้ใช้ต้องเป็นภาษาอังกฤษ ตัวเลข หรือ _ เท่านั้น (ห้ามเว้นวรรค)',
+    passwordInvalid: 'รหัสผ่านต้องเป็นภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์เท่านั้น',
     required: '*',
   },
 };
+
+// Regex สำหรับตรวจสอบว่าเป็นภาษาอังกฤษเท่านั้น
+const usernameRegex = /^[a-zA-Z0-9_]+$/;
+const passwordRegex = /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/;
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -74,6 +84,15 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!usernameRegex.test(formData.username)) {
+      toast.error(t.usernameInvalid);
+      return;
+    }
+    if (!passwordRegex.test(formData.password)) {
+      toast.error(t.passwordInvalid);
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       toast.error(t.passwordMismatch);
       return;
@@ -82,6 +101,7 @@ const Register = () => {
       toast.error(t.passwordLength);
       return;
     }
+
     setLoading(true);
     try {
       const payload = { ...formData };
@@ -100,6 +120,7 @@ const Register = () => {
     formData.confirmPassword && formData.password === formData.confirmPassword;
   const passwordMismatch =
     formData.confirmPassword && formData.password !== formData.confirmPassword;
+  const passwordValid = formData.password.length >= 8;
 
   return (
     <div className="auth-wrapper">
@@ -187,6 +208,8 @@ const Register = () => {
                   minLength="3"
                   maxLength="50"
                   autoComplete="username"
+                  pattern="^[a-zA-Z0-9_]+$"
+                  title={t.usernameInvalid}
                 />
               </div>
 
@@ -238,14 +261,27 @@ const Register = () => {
                     value={formData.password}
                     onChange={handleChange}
                     style={{ paddingRight: '44px' }}
-                  required
-                  minLength="8"
-                  autoComplete="new-password"
+                    required
+                    minLength="8"
+                    autoComplete="new-password"
+                    pattern="^[a-zA-Z0-9!@#$%^&amp;*()_+\-=\[\]{};':&quot;\\|,.&lt;&gt;\/?]+$"
+                    title={t.passwordInvalid}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} tabIndex="-1" style={eyeBtnStyle}>
                     {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
                 </div>
+                {/* แสดง hint เฉพาะเมื่อผู้ใช้เริ่มพิมพ์แล้วเท่านั้น */}
+                {formData.password.length > 0 && (
+                  <p style={{
+                    fontSize: '11px',
+                    marginTop: '4px',
+                    fontWeight: '600',
+                    color: passwordValid ? 'var(--success, #22c55e)' : 'var(--danger)',
+                  }}>
+                    {t.passwordHint}
+                  </p>
+                )}
               </div>
 
               {/* Confirm Password */}
@@ -262,9 +298,9 @@ const Register = () => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     style={{ paddingRight: '44px' }}
-                  required
-                  minLength="8"
-                  autoComplete="new-password"
+                    required
+                    minLength="8"
+                    autoComplete="new-password"
                   />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} tabIndex="-1" style={eyeBtnStyle}>
                     {showConfirmPassword ? <Eye size={16} /> : <EyeOff size={16} />}

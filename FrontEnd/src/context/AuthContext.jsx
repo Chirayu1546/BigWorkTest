@@ -1,50 +1,54 @@
-import { createContext, useState } from 'react';
+import { createContext, useState, useEffect } from 'react';
+import axiosClient from '../api/axiosClient';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
-    try {
-      return storedUser ? JSON.parse(storedUser) : null;
-    } catch {
-      localStorage.removeItem('user');
-      sessionStorage.removeItem('user');
-      return null;
-    }
+    const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
   });
+  const [loading, setLoading] = useState(true);
 
+  // ตั้งค่า token ให้ axiosClient ทุกครั้งที่แอปโหลด (รองรับ refresh หน้า)
+  useEffect(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (token) {
+      axiosClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+    setLoading(false);
+  }, []);
+
+  // login: เก็บ user ทั้งก้อนที่ backend ส่งมา (รวม profile_picture) ไม่ตัด field ทิ้ง
   const login = (userData, token, rememberMe = false) => {
     const storage = rememberMe ? localStorage : sessionStorage;
-    const otherStorage = rememberMe ? sessionStorage : localStorage;
-    setUser(userData);
-    otherStorage.removeItem('user');
-    otherStorage.removeItem('token');
     storage.setItem('user', JSON.stringify(userData));
     storage.setItem('token', token);
-  };
-
-  const updateUser = (changes) => {
-    setUser((currentUser) => {
-      if (!currentUser) return currentUser;
-
-      const updatedUser = { ...currentUser, ...changes };
-      const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-      storage.setItem('user', JSON.stringify(updatedUser));
-      return updatedUser;
-    });
+    axiosClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setUser(userData);
   };
 
   const logout = () => {
-    setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('token');
+    delete axiosClient.defaults.headers.common['Authorization'];
+    setUser(null);
+  };
+
+  // updateUser: merge ค่าที่เปลี่ยนเข้ากับ user เดิม ไม่ overwrite ทั้ง object
+  const updateUser = (partialData) => {
+    setUser((currentUser) => {
+      const updated = { ...currentUser, ...partialData };
+      const storage = localStorage.getItem('user') ? localStorage : sessionStorage;
+      storage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, updateUser, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
