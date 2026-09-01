@@ -127,7 +127,6 @@ const Invoice = () => {
         {/* Footer */}
         <div style={{ marginTop: '40px', textAlign: 'center', fontSize: '12px', color: '#777777', borderTop: '1px solid #eeeeee', paddingTop: '16px' }}>
           ขอบคุณที่ใช้บริการ!<br />
-          หากมีข้อสงสัยเกี่ยวกับใบสั่งขายนี้ กรุณาติดต่อ support@onlinestore.com<br />
         </div>
       </div>
 

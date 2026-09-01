@@ -9,8 +9,8 @@ const User = sequelize.define('User', {
   full_name: { type: DataTypes.STRING },
   profile_picture: { type: DataTypes.STRING },
   phone: { type: DataTypes.STRING, },
-  role: { type: DataTypes.ENUM('user', 'admin'), defaultValue: 'user' },
-  
+  role: { type: DataTypes.ENUM('admin', 'employee'), defaultValue: 'employee' },
+  pin_code: { type: DataTypes.STRING, allowNull: true },
 }, {
   tableName: 'users',
   timestamps: true,

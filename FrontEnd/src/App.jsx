@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { AuthContext, AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { CartProvider } from './context/CartContext';
+import { AlertProvider } from './context/AlertContext';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Login from './pages/Login';
@@ -16,6 +17,7 @@ import Cart from './pages/Cart';
 import Invoice from './pages/Invoice';
 import Profile from './pages/Profile';
 import EmployeeList from './pages/EmployeeList';
+import FloatingCartButton from './components/FloatingCartButton';
 
 const Layout = ({ children, lang, setLang }) => {
   const location = useLocation();
@@ -43,6 +45,7 @@ const Layout = ({ children, lang, setLang }) => {
           {children}
         </div>
       </div>
+      <FloatingCartButton />
     </div>
   );
 };
@@ -69,25 +72,27 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
-        <AuthProvider>
-          <CartProvider>
-            <Layout lang={lang} setLang={setLang}>
-              <Routes>
-                <Route path="/" element={<Navigate to="/products" replace />} />
-                <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
-                <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
-                <Route path="/products" element={<RequireAuth><Products lang={lang} /></RequireAuth>} />
-                <Route path="/manage-products" element={<RequireAuth><RequireAdmin><ManageProducts lang={lang} /></RequireAdmin></RequireAuth>} />
-                <Route path="/employees" element={<RequireAuth><RequireAdmin><EmployeeList lang={lang} /></RequireAdmin></RequireAuth>} />
-                <Route path="/cart" element={<RequireAuth><Cart lang={lang} /></RequireAuth>} />
-                <Route path="/invoice/:orderId" element={<RequireAuth><Invoice /></RequireAuth>} />
-                <Route path="/profile" element={<RequireAuth><Profile lang={lang} /></RequireAuth>} />
-                <Route path="*" element={<Navigate to="/products" replace />} />
-              </Routes>
-            </Layout>
-            <ToastContainer position="top-right" autoClose={3000} theme="colored" />
-          </CartProvider>
-        </AuthProvider>
+        <AlertProvider>
+          <AuthProvider>
+            <CartProvider>
+              <Layout lang={lang} setLang={setLang}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/products" replace />} />
+                  <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+                  <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
+                  <Route path="/products" element={<RequireAuth><Products lang={lang} /></RequireAuth>} />
+                  <Route path="/manage-products" element={<RequireAuth><RequireAdmin><ManageProducts lang={lang} /></RequireAdmin></RequireAuth>} />
+                  <Route path="/employees" element={<RequireAuth><RequireAdmin><EmployeeList lang={lang} /></RequireAdmin></RequireAuth>} />
+                  <Route path="/cart" element={<RequireAuth><Cart lang={lang} /></RequireAuth>} />
+                  <Route path="/invoice/:orderId" element={<RequireAuth><Invoice /></RequireAuth>} />
+                  <Route path="/profile" element={<RequireAuth><Profile lang={lang} /></RequireAuth>} />
+                  <Route path="*" element={<Navigate to="/products" replace />} />
+                </Routes>
+              </Layout>
+              <ToastContainer position="top-right" autoClose={3000} theme="colored" />
+            </CartProvider>
+          </AuthProvider>
+        </AlertProvider>
       </Router>
     </ThemeProvider>
   );

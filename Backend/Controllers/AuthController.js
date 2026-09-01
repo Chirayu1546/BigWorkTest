@@ -114,3 +114,63 @@ exports.me = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// ==========================================
+// ADMIN PIN CODE FUNCTIONS
+// ==========================================
+
+// POST /api/auth/verify-pin (สำหรับให้ Employee ยิงมาตรวจสอบ PIN ของ Admin)
+exports.verifyAdminPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin) {
+      return res.status(400).json({ message: 'กรุณากรอก PIN Code' });
+    }
+
+    // ค้นหา Admin ในระบบที่มีการตั้งค่า pin_code ไว้
+    const admin = await User.findOne({ where: { role: 'admin' } });
+    
+    if (!admin || !admin.pin_code) {
+      return res.status(404).json({ message: 'ยังไม่มีการตั้งค่า Admin PIN ในระบบ' });
+    }
+
+    // ตรวจสอบความถูกต้องของ PIN ผ่าน bcrypt
+    const isMatch = await bcrypt.compare(pin, admin.pin_code);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'รหัส Admin PIN ไม่ถูกต้อง' });
+    }
+
+    return res.json({ success: true, message: 'ยืนยัน PIN สำเร็จ' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// PUT /api/auth/set-pin (สำหรับ Admin ตั้งค่า หรือ เปลี่ยนรหัส PIN ตัวเอง)
+exports.setAdminPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden: Admin access required' });
+    }
+
+    if (!pin || pin.length < 4 || pin.length > 6) {
+      return res.status(400).json({ message: 'PIN Code ต้องเป็นตัวเลข 4-6 หลัก' });
+    }
+
+    const admin = await User.findByPk(req.user.user_id);
+    if (!admin) return res.status(404).json({ message: 'User not found' });
+
+    // Hash รหัส PIN ก่อนลง DB
+    const salt = await bcrypt.genSalt(10);
+    admin.pin_code = await bcrypt.hash(pin, salt);
+    await admin.save();
+
+    return res.json({ success: true, message: 'ตั้งค่า Admin PIN สำเร็จ' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};

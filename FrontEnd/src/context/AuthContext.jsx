@@ -3,10 +3,14 @@ import axiosClient from '../api/axiosClient';
 
 export const AuthContext = createContext();
 
+const normalizeRole = (role) => (role === 'user' ? 'employee' : role || 'employee');
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (!parsedUser) return null;
+    return { ...parsedUser, role: normalizeRole(parsedUser.role) };
   });
   const [loading, setLoading] = useState(true);
 
@@ -21,11 +25,12 @@ export const AuthProvider = ({ children }) => {
 
   // login: เก็บ user ทั้งก้อนที่ backend ส่งมา (รวม profile_picture) ไม่ตัด field ทิ้ง
   const login = (userData, token, rememberMe = false) => {
+    const normalizedUser = { ...userData, role: normalizeRole(userData?.role) };
     const storage = rememberMe ? localStorage : sessionStorage;
-    storage.setItem('user', JSON.stringify(userData));
+    storage.setItem('user', JSON.stringify(normalizedUser));
     storage.setItem('token', token);
     axiosClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(userData);
+    setUser(normalizedUser);
   };
 
   const logout = () => {
@@ -40,7 +45,7 @@ export const AuthProvider = ({ children }) => {
   // updateUser: merge ค่าที่เปลี่ยนเข้ากับ user เดิม ไม่ overwrite ทั้ง object
   const updateUser = (partialData) => {
     setUser((currentUser) => {
-      const updated = { ...currentUser, ...partialData };
+      const updated = { ...currentUser, ...partialData, role: normalizeRole(partialData?.role ?? currentUser?.role) };
       const storage = localStorage.getItem('user') ? localStorage : sessionStorage;
       storage.setItem('user', JSON.stringify(updated));
       return updated;

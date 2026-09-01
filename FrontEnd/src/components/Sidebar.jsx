@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBag, ShoppingCart, LogOut, ChevronLeft, ChevronRight, Package, Users } from 'lucide-react';
+import { ShoppingBag, LogOut, ChevronLeft, ChevronRight, Package, Users } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 
 const BigWorkLogo = () => (
@@ -11,7 +11,6 @@ const translations = {
   en: {
     appName: 'OnlineStore',
     products: 'Products',
-    cart: 'Cart',
     manageProducts: 'Manage Products',
     employees: 'Employees',
     logout: 'Logout',
@@ -19,7 +18,6 @@ const translations = {
   th: {
     appName: 'ร้านค้าออนไลน์',
     products: 'สินค้า',
-    cart: 'ตะกร้าสินค้า',
     manageProducts: 'จัดการสินค้า',
     employees: 'จัดการผู้ใช้',
     logout: 'ออกจากระบบ',
@@ -37,7 +35,6 @@ const Sidebar = ({ lang, collapsed, setCollapsed }) => {
 
   const navItems = [
     { path: '/products', icon: <ShoppingBag size={18} />, label: t.products },
-    { path: '/cart', icon: <ShoppingCart size={18} />, label: t.cart },
     ...(user?.role === 'admin'
       ? [
           { path: '/manage-products', icon: <Package size={18} />, label: t.manageProducts },

@@ -329,18 +329,18 @@ const Profile = ({ lang = 'th' }) => {
               />
             </div>
 
-            {/* Role: admin แก้ของตัวเองได้ / user แก้ไม่ได้ */}
+            {/* Role: admin แก้ของตัวเองได้ / employee แก้ไม่ได้ */}
             <div>
               <label style={labelStyle}><ShieldCheck size={13} /> {t.role}</label>
               <select
                 className="premium-input"
-                value={profile.role || 'user'}
+                value={profile.role || 'employee'}
                 onChange={e => setProfile({ ...profile, role: e.target.value })}
                 disabled={profile.role !== 'admin'}
                 aria-label={t.role}
                 style={profile.role !== 'admin' ? { cursor: 'not-allowed', opacity: 0.75 } : {}}
               >
-                <option value="user">USER</option>
+                <option value="employee">EMPLOYEE</option>
                 <option value="admin">ADMIN</option>
               </select>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '6px 0 0' }}>

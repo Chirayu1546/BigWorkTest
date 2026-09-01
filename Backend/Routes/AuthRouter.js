@@ -141,4 +141,48 @@ router.post('/login', authController.login);
  */
 router.get('/me', authenticate, authController.me);
 
+/**
+ * @swagger
+ * /api/auth/verify-pin:
+ *   post:
+ *     summary: Verify Admin PIN Code
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - pin
+ *             properties:
+ *               pin:
+ *                 type: string
+ *                 example: "123456"
+ *                 description: 4 to 6 digits Admin PIN
+ *     responses:
+ *       200:
+ *         description: PIN verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "ยืนยัน PIN สำเร็จ"
+ *       400:
+ *         description: Missing PIN code
+ *       401:
+ *         description: Invalid Admin PIN or Unauthorized
+ *       404:
+ *         description: Admin PIN not configured in system
+ */
+router.post('/verify-pin', authenticate, authController.verifyAdminPin);
+
 module.exports = router;

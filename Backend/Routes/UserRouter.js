@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const { authenticate, requireAdmin } = require('../Middleware/authMiddleware');
 
+// Middleware ตรวจสอบว่าเป็นเจ้าของโปรไฟล์หรือ Admin
 const requireOwnProfile = (req, res, next) => {
   if (req.user.role !== 'admin' && req.user.user_id !== Number(req.params.id)) {
     return res.status(403).json({ message: 'You can only access your own profile' });
@@ -18,10 +19,29 @@ const storage = multer.diskStorage({
     cb(null, path.join(__dirname, '../uploads/'));
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage: storage });
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // จำกัดขนาด 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const extName = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimeType = allowedTypes.test(file.mimetype);
+
+    if (extName && mimeType) {
+      return cb(null, true);
+    }
+    cb(new Error('Only image files (jpg, jpeg, png, webp) are allowed!'));
+  }
+});
+
+/* ==========================================================================
+   USER PROFILE ROUTES (สำหรับผู้ใช้ทั่วไป / เจ้าของบัญชี)
+   ========================================================================== */
 
 /**
  * @swagger
@@ -37,31 +57,13 @@ const upload = multer({ storage: storage });
  *         required: true
  *         schema:
  *           type: integer
- *         description: User ID
  *     responses:
  *       200:
  *         description: User profile retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                 username:
- *                   type: string
- *                 email:
- *                   type: string
- *                 full_name:
- *                   type: string
- *                 phone:
- *                   type: string
- *                 address:
- *                   type: string
- *                 avatar_url:
- *                   type: string
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  *       404:
  *         description: User not found
  */
@@ -81,7 +83,6 @@ router.get('/profile/:id', authenticate, requireOwnProfile, userController.getPr
  *         required: true
  *         schema:
  *           type: integer
- *         description: User ID
  *     requestBody:
  *       required: true
  *       content:
@@ -93,41 +94,21 @@ router.get('/profile/:id', authenticate, requireOwnProfile, userController.getPr
  *                 type: string
  *               phone:
  *                 type: string
- *               address:
- *                 type: string
  *               email:
  *                 type: string
- *                 format: email
+ *               current_password:
+ *                 type: string
+ *               new_password:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Profile updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Profile updated successfully"
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     full_name:
- *                       type: string
- *                     phone:
- *                       type: string
- *                     address:
- *                       type: string
  *       400:
  *         description: Invalid input
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden (not the profile owner)
- *       404:
- *         description: User not found
+ *         description: Forbidden
  */
 router.put('/profile/:id', authenticate, requireOwnProfile, userController.updateProfile);
 
@@ -145,15 +126,12 @@ router.put('/profile/:id', authenticate, requireOwnProfile, userController.updat
  *         required: true
  *         schema:
  *           type: integer
- *         description: User ID
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required:
- *               - avatar
  *             properties:
  *               avatar:
  *                 type: string
@@ -161,25 +139,10 @@ router.put('/profile/:id', authenticate, requireOwnProfile, userController.updat
  *     responses:
  *       200:
  *         description: Avatar uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Avatar uploaded successfully"
- *                 avatar_url:
- *                   type: string
- *                   example: "/uploads/1735300000000.jpg"
  *       400:
- *         description: No file uploaded or invalid file type
+ *         description: Invalid file format
  *       401:
  *         description: Unauthorized
- *       403:
- *         description: Forbidden (not the profile owner)
- *       404:
- *         description: User not found
  */
 router.post('/profile/:id/avatar', authenticate, requireOwnProfile, upload.single('avatar'), userController.uploadAvatar);
 
@@ -197,72 +160,105 @@ router.post('/profile/:id/avatar', authenticate, requireOwnProfile, upload.singl
  *         required: true
  *         schema:
  *           type: integer
- *         description: User ID
  *     responses:
  *       200:
  *         description: Avatar removed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Avatar removed successfully"
  *       400:
  *         description: No avatar to delete
  *       401:
  *         description: Unauthorized
- *       403:
- *         description: Forbidden (not the profile owner)
- *       404:
- *         description: User not found
  */
 router.delete('/profile/:id/avatar', authenticate, requireOwnProfile, userController.deleteAvatar);
+
+
+/* ==========================================================================
+   ADMIN MANAGEMENT ROUTES (เฉพาะ Admin เท่านั้น)
+   ========================================================================== */
 
 /**
  * @swagger
  * /api/users:
  *   get:
  *     summary: Get all users (admin only)
- *     tags: [Users]
+ *     tags: [Users Management]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: A list of users
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   user_id:
- *                     type: integer
- *                   username:
- *                     type: string
- *                   email:
- *                     type: string
- *                   full_name:
- *                     type: string
- *                   phone:
- *                     type: string
- *                   role:
- *                     type: string
- *                     enum: [admin, user]
- *                   profile_picture:
- *                     type: string
- *                   created_at:
- *                     type: string
- *                     format: date-time
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden (not admin)
- *       500:
- *         description: Server error
  */
 router.get('/', authenticate, requireAdmin, userController.getAllUsers);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   put:
+ *     summary: Admin update any user's profile or role (admin only)
+ *     tags: [Users Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               full_name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [admin, employee]
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *       400:
+ *         description: Invalid request or role limits reached
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not admin)
+ */
+router.put('/:id', authenticate, requireAdmin, userController.adminUpdateUser);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   delete:
+ *     summary: Delete a user account (admin only)
+ *     tags: [Users Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       400:
+ *         description: Cannot delete self or last remaining admin
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not admin)
+ */
+router.delete('/:id', authenticate, requireAdmin, userController.adminDeleteUser);
 
 module.exports = router;
